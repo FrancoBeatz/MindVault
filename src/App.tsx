@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { 
   Plus, 
   LogOut, 
@@ -16,6 +18,7 @@ import {
 import { useAuthStore } from './store/authStore';
 import { cn, getGreeting } from './lib/utils';
 import { format } from 'date-fns';
+import NotFound from './pages/NotFound';
 
 // --- Components ---
 
@@ -97,13 +100,11 @@ const LoginPage = ({ onToggle }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const setAuth = useAuthStore(state => state.setAuth);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -113,8 +114,9 @@ const LoginPage = ({ onToggle }: any) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAuth(data.user, data.token);
+      toast.success(`Welcome back, ${data.user.name}!`);
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -136,12 +138,6 @@ const LoginPage = ({ onToggle }: any) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center text-sm">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <label className="text-sm font-medium text-zinc-400 ml-1">Email Address</label>
             <Input type="email" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} required />
@@ -167,13 +163,11 @@ const RegisterPage = ({ onToggle }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const setAuth = useAuthStore(state => state.setAuth);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -183,8 +177,9 @@ const RegisterPage = ({ onToggle }: any) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAuth(data.user, data.token);
+      toast.success('Account created successfully! Welcome to MindVault.');
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -206,12 +201,6 @@ const RegisterPage = ({ onToggle }: any) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center text-sm">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {error}
-            </div>
-          )}
           <div className="space-y-2">
             <label className="text-sm font-medium text-zinc-400 ml-1">Full Name</label>
             <Input type="text" placeholder="John Doe" value={name} onChange={(e: any) => setName(e.target.value)} required />
@@ -256,6 +245,7 @@ const Dashboard = () => {
       setJournals(data);
     } catch (err) {
       console.error(err);
+      toast.error('Failed to load journals');
     } finally {
       setLoading(false);
     }
@@ -263,7 +253,21 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchJournals();
+    // Load draft from local storage
+    const draft = localStorage.getItem('mindvault-draft');
+    if (draft) {
+      const { title, content } = JSON.parse(draft);
+      setNewTitle(title);
+      setNewContent(content);
+    }
   }, []);
+
+  // Auto-save draft
+  useEffect(() => {
+    if (newTitle || newContent) {
+      localStorage.setItem('mindvault-draft', JSON.stringify({ title: newTitle, content: newContent }));
+    }
+  }, [newTitle, newContent]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,11 +284,14 @@ const Dashboard = () => {
       if (res.ok) {
         setNewTitle('');
         setNewContent('');
+        localStorage.removeItem('mindvault-draft');
         setIsModalOpen(false);
         fetchJournals();
+        toast.success('Journal entry saved to vault');
       }
     } catch (err) {
       console.error(err);
+      toast.error('Failed to save journal entry');
     } finally {
       setIsCreating(false);
     }
@@ -300,10 +307,17 @@ const Dashboard = () => {
       if (res.ok) {
         setJournals(journals.filter(j => j.id !== deleteId));
         setDeleteId(null);
+        toast.success('Entry deleted successfully');
       }
     } catch (err) {
       console.error(err);
+      toast.error('Failed to delete entry');
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    toast.info('Logged out successfully');
   };
 
   const filteredJournals = journals.filter(j => 
@@ -332,7 +346,7 @@ const Dashboard = () => {
               <span className="text-sm font-medium text-zinc-100">{user?.name}</span>
               <span className="text-xs text-zinc-500">{user?.email}</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
               <LogOut className="h-5 w-5 md:mr-2" />
               <span className="hidden md:inline">Logout</span>
             </Button>
@@ -521,9 +535,9 @@ const Dashboard = () => {
   );
 };
 
-// --- Main App ---
+// --- Auth Wrapper ---
 
-export default function App() {
+const AuthWrapper = () => {
   const { token } = useAuthStore();
   const [isRegister, setIsRegister] = useState(false);
 
@@ -536,4 +550,16 @@ export default function App() {
   }
 
   return <Dashboard />;
+};
+
+// --- Main App ---
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<AuthWrapper />} />
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
+    </Routes>
+  );
 }

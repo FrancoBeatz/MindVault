@@ -1,37 +1,20 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+dotenv.config();
 
-const db = new Database(path.join(__dirname, '../../mindvault.db'));
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-export function initDb() {
-  // Users Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Journals Table
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS journals (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      title TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-  `);
-
-  console.log('✅ Database initialized');
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Supabase credentials missing. Database operations will fail.');
 }
 
-export default db;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export function initDb() {
+  console.log('📡 Supabase client initialized');
+  // Note: Tables must be created manually in Supabase SQL Editor using the provided SQL.
+}
+
+export default supabase;

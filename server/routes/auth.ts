@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../config/db.js';
+import supabase from '../config/db.js';
 import nodemailer from 'nodemailer';
 
 const router = express.Router();
@@ -12,15 +12,27 @@ router.post('/register', async (req, res) => {
 
   try {
     // Check if user exists
-    const existingUser = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const { data: existingUser, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
     if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert user
-    const result = db.prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?)').run(name, email, hashedPassword);
-    const userId = result.lastInsertRowid;
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert([{ name, email, password: hashedPassword }])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    const userId = newUser.id;
 
     // Send Welcome Email (Optional/Best effort)
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
@@ -65,7 +77,12 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user: any = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+    const { data: user, error: fetchError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);

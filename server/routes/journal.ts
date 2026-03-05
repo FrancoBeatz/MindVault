@@ -1,5 +1,5 @@
 import express from 'express';
-import supabase from '../config/db.js';
+import sql from '../config/postgres.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -7,17 +7,20 @@ const router = express.Router();
 // Get all journals for user
 router.get('/', authenticateToken, async (req: any, res) => {
   try {
-    const { data: journals, error } = await supabase
-      .from('journals')
-      .select('*')
-      .eq('user_id', req.user.id)
-      .order('created_at', { ascending: false });
+    const journals = await sql`
+      SELECT * FROM journals 
+      WHERE user_id = ${req.user.id} 
+      ORDER BY created_at DESC
+    `;
 
-    if (error) throw error;
     res.json(journals);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching journals' });
+  } catch (error: any) {
+    console.error('Database Error:', error);
+    res.status(500).json({ 
+      message: 'Error fetching journals', 
+      error: error.message,
+      code: error.code
+    });
   }
 });
 
@@ -27,13 +30,12 @@ router.post('/', authenticateToken, async (req: any, res) => {
   if (!title || !content) return res.status(400).json({ message: 'Title and content are required' });
 
   try {
-    const { data: newJournal, error } = await supabase
-      .from('journals')
-      .insert([{ user_id: req.user.id, title, content }])
-      .select()
-      .single();
+    const [newJournal] = await sql`
+      INSERT INTO journals (user_id, title, content)
+      VALUES (${req.user.id}, ${title}, ${content})
+      RETURNING *
+    `;
 
-    if (error) throw error;
     res.status(201).json(newJournal);
   } catch (error) {
     console.error(error);
@@ -44,21 +46,17 @@ router.post('/', authenticateToken, async (req: any, res) => {
 // Delete journal
 router.delete('/:id', authenticateToken, async (req: any, res) => {
   try {
-    const { data: journal, error: fetchError } = await supabase
-      .from('journals')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const [journal] = await sql`
+      SELECT * FROM journals WHERE id = ${req.params.id}
+    `;
 
     if (!journal) return res.status(404).json({ message: 'Journal not found' });
     if (journal.user_id !== req.user.id) return res.status(403).json({ message: 'Unauthorized' });
 
-    const { error: deleteError } = await supabase
-      .from('journals')
-      .delete()
-      .eq('id', req.params.id);
+    await sql`
+      DELETE FROM journals WHERE id = ${req.params.id}
+    `;
 
-    if (deleteError) throw deleteError;
     res.json({ message: 'Journal deleted successfully' });
   } catch (error) {
     console.error(error);

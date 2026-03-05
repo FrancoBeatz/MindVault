@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import supabase from '../config/db.js';
+import sql from '../config/postgres.js';
 import nodemailer from 'nodemailer';
 
 const router = express.Router();
@@ -12,25 +12,21 @@ router.post('/register', async (req, res) => {
 
   try {
     // Check if user exists
-    const { data: existingUser, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const users = await sql`
+      SELECT * FROM users WHERE email = ${email}
+    `;
 
-    if (existingUser) return res.status(400).json({ message: 'User already exists' });
+    if (users.length > 0) return res.status(400).json({ message: 'User already exists' });
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert user
-    const { data: newUser, error: insertError } = await supabase
-      .from('users')
-      .insert([{ name, email, password: hashedPassword }])
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
+    const [newUser] = await sql`
+      INSERT INTO users (name, email, password)
+      VALUES (${name}, ${email}, ${hashedPassword})
+      RETURNING *
+    `;
 
     const userId = newUser.id;
 
@@ -77,11 +73,9 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const { data: user, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const [user] = await sql`
+      SELECT * FROM users WHERE email = ${email}
+    `;
 
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 

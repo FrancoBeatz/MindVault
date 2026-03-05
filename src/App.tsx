@@ -111,12 +111,20 @@ const LoginPage = ({ onToggle }: any) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned a non-JSON response. Please check your deployment configuration.');
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      if (!res.ok) throw new Error(data.message || 'Login failed');
+      
       setAuth(data.user, data.token);
       toast.success(`Welcome back, ${data.user.name}!`);
     } catch (err: any) {
       toast.error(err.message);
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
@@ -174,12 +182,20 @@ const RegisterPage = ({ onToggle }: any) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned a non-JSON response. Please check your deployment configuration.');
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      if (!res.ok) throw new Error(data.message || 'Registration failed');
+      
       setAuth(data.user, data.token);
       toast.success('Account created successfully! Welcome to MindVault.');
     } catch (err: any) {
       toast.error(err.message);
+      console.error('Registration error:', err);
     } finally {
       setLoading(false);
     }
@@ -241,11 +257,25 @@ const Dashboard = () => {
       const res = await fetch('/api/journals', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned invalid response format');
+      }
+
       const data = await res.json();
-      setJournals(data);
-    } catch (err) {
+      if (!res.ok) throw new Error(data.message || 'Failed to load journals');
+      
+      if (Array.isArray(data)) {
+        setJournals(data);
+      } else {
+        console.error('Expected array of journals, got:', data);
+        setJournals([]);
+      }
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to load journals');
+      toast.error(err.message || 'Failed to load journals');
+      setJournals([]);
     } finally {
       setLoading(false);
     }
@@ -305,7 +335,7 @@ const Dashboard = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        setJournals(journals.filter(j => j.id !== deleteId));
+        setJournals(prev => Array.isArray(prev) ? prev.filter(j => j.id !== deleteId) : []);
         setDeleteId(null);
         toast.success('Entry deleted successfully');
       }
@@ -320,10 +350,10 @@ const Dashboard = () => {
     toast.info('Logged out successfully');
   };
 
-  const filteredJournals = journals.filter(j => 
-    j.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    j.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredJournals = Array.isArray(journals) ? journals.filter(j => 
+    j.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    j.content?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) : [];
 
   const wordCount = newContent.trim() ? newContent.trim().split(/\s+/).length : 0;
   const charLimit = 2000;

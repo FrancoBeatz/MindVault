@@ -14,13 +14,9 @@ router.get('/', authenticateToken, async (req: any, res) => {
     `;
 
     res.json(journals);
-  } catch (error: any) {
-    console.error('Database Error:', error);
-    res.status(500).json({ 
-      message: 'Error fetching journals', 
-      error: error.message,
-      code: error.code
-    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching journals' });
   }
 });
 

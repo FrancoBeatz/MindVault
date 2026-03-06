@@ -22,6 +22,139 @@ import NotFound from './pages/NotFound';
 
 // --- Components ---
 
+const VaultEntrance = () => {
+  const setAuth = useAuthStore(state => state.setAuth);
+  const [isUnlocking, setIsUnlocking] = useState(false);
+
+  const handleUnlock = async () => {
+    setIsUnlocking(true);
+    try {
+      // Attempt to login with demo credentials
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'demo@mindvault.io', password: 'demo-password-123' }),
+      });
+
+      if (!res.ok) {
+        // If demo user doesn't exist, register it
+        const regRes = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Demo Explorer', email: 'demo@mindvault.io', password: 'demo-password-123' }),
+        });
+        
+        if (regRes.ok) {
+          const data = await regRes.json();
+          setAuth(data.user, data.token);
+          toast.success('Vault Unlocked. Welcome, Explorer.');
+          return;
+        }
+      } else {
+        const data = await res.json();
+        setAuth(data.user, data.token);
+        toast.success('Vault Unlocked. Welcome back, Explorer.');
+        return;
+      }
+      
+      throw new Error('Demo initialization failed');
+    } catch (err) {
+      console.error(err);
+      // Fallback to local-only guest mode if server is unavailable
+      setAuth({ id: -1, name: 'Guest Explorer', email: 'guest@mindvault.demo' }, 'guest-token');
+      toast.info('Entering as Guest (Local Session)');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-[#0a0502] flex items-center justify-center font-serif selection:bg-orange-500/30">
+      {/* Immersive Background (Recipe 7: Atmospheric) */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,#3a1510_0%,transparent_60%)] opacity-80 blur-[80px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_80%,#ff4e00_0%,transparent_50%)] opacity-40 blur-[80px]" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] mix-blend-overlay" />
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 text-center px-6 max-w-2xl"
+      >
+        <motion.div
+          animate={{ 
+            scale: [1, 1.02, 1],
+            rotate: [0, 2, -2, 0]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="w-24 h-24 mx-auto mb-12 rounded-full border border-white/10 bg-white/5 backdrop-blur-2xl flex items-center justify-center shadow-[0_0_60px_rgba(255,78,0,0.15)]"
+        >
+          <BookOpen className="h-10 w-10 text-orange-500/80" />
+        </motion.div>
+
+        <h1 className="text-6xl md:text-8xl font-light tracking-tighter text-white mb-6 drop-shadow-2xl">
+          MindVault
+        </h1>
+        
+        <div className="h-px w-24 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent mx-auto mb-8" />
+
+        <p className="text-zinc-400 text-lg md:text-xl max-w-md mx-auto mb-16 font-sans font-light leading-relaxed tracking-wide">
+          A digital sanctuary for your most profound reflections. 
+          <span className="block mt-2 text-zinc-600 italic text-base">Secure. Private. Timeless.</span>
+        </p>
+
+        <button
+          onClick={handleUnlock}
+          disabled={isUnlocking}
+          className="group relative px-16 py-5 bg-transparent border border-white/10 rounded-full overflow-hidden transition-all duration-500 hover:border-orange-500/40 hover:scale-105 active:scale-95"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <span className="relative z-10 text-white font-sans tracking-[0.2em] uppercase text-xs font-semibold flex items-center gap-4">
+            {isUnlocking ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                Synchronizing...
+              </>
+            ) : (
+              <>
+                Unlock the Vault
+                <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
+              </>
+            )}
+          </span>
+        </button>
+
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="mt-20 flex items-center justify-center gap-12 opacity-20 grayscale hover:opacity-40 transition-opacity duration-700"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <Clock className="h-5 w-5 text-white" />
+            <span className="text-[9px] uppercase tracking-[0.3em] font-sans">Ephemeral</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <Plus className="h-5 w-5 text-white" />
+            <span className="text-[9px] uppercase tracking-[0.3em] font-sans">Infinite</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <Search className="h-5 w-5 text-white" />
+            <span className="text-[9px] uppercase tracking-[0.3em] font-sans">Insight</span>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      {/* Footer Micro-detail */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-20 text-[10px] uppercase tracking-[0.5em] text-white font-sans pointer-events-none">
+        Demo Experience v1.0
+      </div>
+    </div>
+  );
+};
+
 const Button = ({ className, variant = 'primary', size = 'md', isLoading, children, ...props }: any) => {
   const variants = {
     primary: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-500/20',
@@ -95,151 +228,6 @@ const Modal = ({ isOpen, onClose, title, children }: any) => (
 );
 
 // --- Pages ---
-
-const LoginPage = ({ onToggle }: any) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const setAuth = useAuthStore(state => state.setAuth);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server returned a non-JSON response. Please check your deployment configuration.');
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login failed');
-      
-      setAuth(data.user, data.token);
-      toast.success(`Welcome back, ${data.user.name}!`);
-    } catch (err: any) {
-      toast.error(err.message);
-      console.error('Login error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl backdrop-blur-xl shadow-2xl"
-      >
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-500 mb-4">
-            <BookOpen className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-zinc-100">Welcome Back</h1>
-          <p className="text-zinc-500 mt-2">Sign in to continue your journey</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-400 ml-1">Email Address</label>
-            <Input type="email" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-400 ml-1">Password</label>
-            <Input type="password" placeholder="••••••••" value={password} onChange={(e: any) => setPassword(e.target.value)} required />
-          </div>
-          <Button className="w-full" size="lg" isLoading={loading}>Sign In</Button>
-        </form>
-
-        <p className="text-center text-zinc-500 mt-6">
-          Don't have an account?{' '}
-          <button onClick={onToggle} className="text-indigo-400 hover:text-indigo-300 font-medium">Create one</button>
-        </p>
-      </motion.div>
-    </div>
-  );
-};
-
-const RegisterPage = ({ onToggle }: any) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const setAuth = useAuthStore(state => state.setAuth);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const contentType = res.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Server returned a non-JSON response. Please check your deployment configuration.');
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Registration failed');
-      
-      setAuth(data.user, data.token);
-      toast.success('Account created successfully! Welcome to MindVault.');
-    } catch (err: any) {
-      toast.error(err.message);
-      console.error('Registration error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl backdrop-blur-xl shadow-2xl"
-      >
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600/10 text-indigo-500 mb-4">
-            <Plus className="h-8 w-8" />
-          </div>
-          <h1 className="text-3xl font-bold text-zinc-100">Create Account</h1>
-          <p className="text-zinc-500 mt-2">Join MindVault and start journaling</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-400 ml-1">Full Name</label>
-            <Input type="text" placeholder="John Doe" value={name} onChange={(e: any) => setName(e.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-400 ml-1">Email Address</label>
-            <Input type="email" placeholder="name@example.com" value={email} onChange={(e: any) => setEmail(e.target.value)} required />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-zinc-400 ml-1">Password</label>
-            <Input type="password" placeholder="••••••••" value={password} onChange={(e: any) => setPassword(e.target.value)} required />
-          </div>
-          <Button className="w-full" size="lg" isLoading={loading}>Create Account</Button>
-        </form>
-
-        <p className="text-center text-zinc-500 mt-6">
-          Already have an account?{' '}
-          <button onClick={onToggle} className="text-indigo-400 hover:text-indigo-300 font-medium">Sign in</button>
-        </p>
-      </motion.div>
-    </div>
-  );
-};
 
 const Dashboard = () => {
   const { user, token, logout } = useAuthStore();
@@ -569,14 +557,9 @@ const Dashboard = () => {
 
 const AuthWrapper = () => {
   const { token } = useAuthStore();
-  const [isRegister, setIsRegister] = useState(false);
 
   if (!token) {
-    return isRegister ? (
-      <RegisterPage onToggle={() => setIsRegister(false)} />
-    ) : (
-      <LoginPage onToggle={() => setIsRegister(true)} />
-    );
+    return <VaultEntrance />;
   }
 
   return <Dashboard />;

@@ -1,6 +1,7 @@
 import express from 'express';
 import sql from '../config/postgres.js';
 import { authenticateToken } from '../middleware/auth.js';
+import ErrorHandler from '../utils/error-handler.js';
 
 const router = express.Router();
 
@@ -15,8 +16,9 @@ router.get('/', authenticateToken, async (req: any, res) => {
 
     res.json(journals);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching journals' });
+    ErrorHandler.logError(error, 'GET /journals', req.user?.id);
+    const apiError = ErrorHandler.handleRouteError(error, 'GET /journals');
+    res.status(apiError.statusCode).json({ message: apiError.message });
   }
 });
 
@@ -34,8 +36,38 @@ router.post('/', authenticateToken, async (req: any, res) => {
 
     res.status(201).json(newJournal);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error creating journal' });
+    ErrorHandler.logError(error, 'POST /journals', req.user?.id);
+    const apiError = ErrorHandler.handleRouteError(error, 'POST /journals');
+    res.status(apiError.statusCode).json({ message: apiError.message });
+  }
+});
+
+// Update journal
+router.put('/:id', authenticateToken, async (req: any, res) => {
+  const { title, content } = req.body;
+  
+  try {
+    const [journal] = await sql`
+      SELECT * FROM journals WHERE id = ${req.params.id}
+    `;
+
+    if (!journal) return res.status(404).json({ message: 'Journal not found' });
+    if (journal.user_id !== req.user.id) return res.status(403).json({ message: 'Unauthorized' });
+
+    const [updatedJournal] = await sql`
+      UPDATE journals 
+      SET title = ${title || journal.title}, 
+          content = ${content || journal.content},
+          updated_at = NOW()
+      WHERE id = ${req.params.id}
+      RETURNING *
+    `;
+
+    res.json(updatedJournal);
+  } catch (error) {
+    ErrorHandler.logError(error, 'PUT /journals/:id', req.user?.id);
+    const apiError = ErrorHandler.handleRouteError(error, 'PUT /journals/:id');
+    res.status(apiError.statusCode).json({ message: apiError.message });
   }
 });
 
@@ -55,8 +87,9 @@ router.delete('/:id', authenticateToken, async (req: any, res) => {
 
     res.json({ message: 'Journal deleted successfully' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error deleting journal' });
+    ErrorHandler.logError(error, 'DELETE /journals/:id', req.user?.id);
+    const apiError = ErrorHandler.handleRouteError(error, 'DELETE /journals/:id');
+    res.status(apiError.statusCode).json({ message: apiError.message });
   }
 });
 
